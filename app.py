@@ -1,19 +1,14 @@
-
+import streamlit as st
 import json
 from datetime import datetime
-import tkinter as tk
-from tkinter import messagebox, filedialog
+import sys
+import os
 
-# -------- REQUIRED VARIABLE TYPES --------
+# ---------------- DATA ----------------
 version_float = 1.1
-allowed_ext = {".json"}
-used_files = set()
-student_record = {}
-example_range = range(1, 10)
-example_frozen = frozenset([1, 2, 3])
 
-# -------- QUESTIONS --------
 questions = [
+    
     {"q": "1. How often does the temperature of your study environment reduce your overall mental efficiency?",
      "opts": [("Never",0),("Rarely",1),("Sometimes",2),("Often",3),("Always",4)]},
 
@@ -67,20 +62,11 @@ psych_states = {
     "Moderate Cognitive Impact": (25, 36),
     "Reduced Performance State": (37, 48),
     "Severe Environmental Impact": (49, 60)
-}
 
-# -------- VALIDATION --------
 
+# ---------------- HELPERS ----------------
 def validate_name(name: str) -> bool:
-    if name.strip() == "":
-        return False
-    for ch in name:  # FOR LOOP (correct use)
-        if not (ch.isalpha() or ch in "-' "):
-            return False
-    return True
-
-def validate_not_empty(value: str) -> bool:
-    return value.strip() != ""
+    return len(name.strip()) > 0 and not any(c.isdigit() for c in name)
 
 def validate_dob(dob: str) -> bool:
     try:
@@ -89,199 +75,81 @@ def validate_dob(dob: str) -> bool:
     except:
         return False
 
-def interpret_score(score):
+def interpret_score(score: int) -> str:
     for state, (low, high) in psych_states.items():
         if low <= score <= high:
             return state
     return "Unknown"
 
-def save_json(filename, data):
+def save_json(filename: str, data: dict):
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
-# -------- APP --------
+# ---------------- STREAMLIT APP ----------------
+st.set_page_config(page_title="Temperature Effect Survey")
+st.title("📝 Temperature Effect Survey")
 
-class SurveyApp:
-    def __init__(self, root):
-        self.root = root
-        root.title("Survey Program")
-        self.main_menu()
+st.info("Please fill out your details and answer all questions honestly.")
 
-    def clear_window(self):
-        for widget in self.root.winfo_children():
-            widget.destroy()
+# --- User Info ---
+name = st.text_input("Given Name")
+surname = st.text_input("Surname")
+dob = st.text_input("Date of Birth (YYYY-MM-DD)")
+sid = st.text_input("Student ID (digits only)")
 
-    def main_menu(self):
-        self.clear_window()
+# --- Start Survey ---
+if st.button("Start Survey"):
 
-        tk.Label(self.root, text="Survey Program", font=("Arial", 18)).pack(pady=10)
+    # Validate inputs
+    errors = []
+    if not validate_name(name):
+        errors.append("Invalid given name.")
+    if not validate_name(surname):
+        errors.append("Invalid surname.")
+    if not validate_dob(dob):
+        errors.append("Invalid date of birth format. Use YYYY-MM-DD.")
+    if not sid.isdigit():
+        errors.append("Student ID must be digits only.")
 
-        tk.Button(self.root, text="1. Load existing result file",
-                  width=40, command=self.load_result_file).pack(pady=5)
+    if errors:
+        for e in errors:
+            st.error(e)
+    else:
+        st.success("All inputs are valid. Proceed to answer the questions below.")
 
-        tk.Button(self.root, text="2. Start new questionnaire",
-                  width=40, command=self.start_survey_info).pack(pady=5)
+        total_score = 0
+        answers = []
 
-        tk.Button(self.root, text="3. Start questionnaire (load questions from file)",
-                  width=40, command=self.load_questions_then_start).pack(pady=5)
+        for idx, q in enumerate(questions):
+            opt_labels = [opt[0] for opt in q["opts"]]
+            choice = st.selectbox(f"Q{idx+1}. {q['q']}", opt_labels, key=f"q{idx}")
+            score = next(score for label, score in q["opts"] if label == choice)
+            total_score += score
+            answers.append({
+                "question": q["q"],
+                "selected_option": choice,
+                "score": score
+            })
 
-        tk.Button(self.root, text="4. Save survey questions + psychological states",
-                  width=40, command=self.save_questions_and_states).pack(pady=5)
+        status = interpret_score(total_score)
 
-    def load_result_file(self):
-        path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
-        if not path:
-            return
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                content = f.read()
-            messagebox.showinfo("File Content", content)
-        except:
-            messagebox.showerror("Error", "Could not read file.")
+        st.markdown(f"## ✅ Your Result: {status}")
+        st.markdown(f"**Total Score:** {total_score}")
 
-    def save_questions_and_states(self):
-        data = {"questions": questions, "psychological_states": psych_states}
-        save_json("survey_questions_and_states.json", data)
-        messagebox.showinfo("Saved", "Saved to survey_questions_and_states.json")
-
-    def start_survey_info(self):
-        self.selected_questions = questions
-        self.show_user_form()
-
-    def load_questions_then_start(self):
-        path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
-        if not path:
-            return
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict) and "questions" in data:
-                self.selected_questions = data["questions"]
-            else:
-                self.selected_questions = data
-        except:
-            messagebox.showerror("Error", "Invalid file.")
-            return
-        self.show_user_form()
-
-    def show_user_form(self):
-        self.clear_window()
-
-        tk.Label(self.root, text="Enter your details", font=("Arial", 16)).pack(pady=10)
-
-        self.name_var = tk.StringVar()
-        self.surname_var = tk.StringVar()
-        self.dob_var = tk.StringVar()
-        self.sid_var = tk.StringVar()
-
-        self.add_entry("Given Name:", self.name_var)
-        self.add_entry("Surname:", self.surname_var)
-        self.add_entry("Date of Birth (YYYY-MM-DD):", self.dob_var)
-        self.add_entry("Student ID:", self.sid_var)
-
-        tk.Button(self.root, text="Start Survey", command=self.validate_user).pack(pady=10)
-
-    def add_entry(self, label, var):
-        frame = tk.Frame(self.root)
-        frame.pack(pady=3)
-        tk.Label(frame, text=label, width=25, anchor="w").pack(side="left")
-        tk.Entry(frame, textvariable=var, width=25).pack(side="left")
-
-    def validate_user(self):
-        name = self.name_var.get()
-        surname = self.surname_var.get()
-        dob = self.dob_var.get()
-        sid = self.sid_var.get()
-
-        while True:  # REAL while loop
-            if not validate_not_empty(name) or not validate_name(name):
-                return messagebox.showerror("Error", "Invalid name.")
-            if not validate_not_empty(surname) or not validate_name(surname):
-                return messagebox.showerror("Error", "Invalid surname.")
-            if not validate_dob(dob):
-                return messagebox.showerror("Error", "Invalid date of birth.")
-            if not sid.isdigit():
-                return messagebox.showerror("Error", "Student ID must be digits.")
-            break
-
-        self.record = {
+        # Save results to JSON
+        record = {
             "name": name,
             "surname": surname,
             "dob": dob,
             "student_id": sid,
+            "total_score": total_score,
+            "result": status,
+            "answers": answers,
             "version": version_float
         }
 
-        self.q_index = 0
-        self.total_score = 0
-        self.answers = []
+        json_filename = f"{sid}_result.json"
+        save_json(json_filename, record)
 
-        self.show_question()
-
-    def show_question(self):
-        self.clear_window()
-
-        q = self.selected_questions[self.q_index]
-
-        tk.Label(self.root, text=f"Question {self.q_index+1}", font=("Arial", 16)).pack(pady=10)
-        tk.Label(self.root, text=q["q"], wraplength=400, justify="left").pack(pady=10)
-
-        self.choice = tk.IntVar(value=-1)
-
-        for i, (text, score) in enumerate(q["opts"], start=1):
-            tk.Radiobutton(self.root, text=text, variable=self.choice, value=i).pack(anchor="w")
-
-        tk.Button(self.root, text="Next", command=self.submit_answer).pack(pady=10)
-
-    def submit_answer(self):
-        c = self.choice.get()
-
-        if c == -1:
-            return messagebox.showerror("Error", "You must select an option.")
-
-        q = self.selected_questions[self.q_index]
-        text, score = q["opts"][c-1]
-
-        self.total_score += score
-        self.answers.append({
-            "question": q["q"],
-            "selected_option": text,
-            "score": score
-        })
-
-        self.q_index += 1
-
-        if self.q_index >= len(self.selected_questions):
-            self.finish()
-        else:
-            self.show_question()
-
-    def finish(self):
-        self.record["total_score"] = self.total_score
-        self.record["result"] = interpret_score(self.total_score)
-        self.record["answers"] = self.answers
-
-        self.clear_window()
-
-        tk.Label(self.root, text="Survey Completed!", font=("Arial", 18)).pack(pady=10)
-        tk.Label(self.root, text=f"Result: {self.record['result']}").pack(pady=10)
-
-        tk.Button(self.root, text="Save Result", command=self.save_result).pack(pady=10)
-        tk.Button(self.root, text="Back to Menu", command=self.main_menu).pack(pady=10)
-
-    def save_result(self):
-        path = filedialog.asksaveasfilename(defaultextension=".json",
-                                            filetypes=[("JSON files", "*.json")])
-        if not path:
-            return
-
-        if not any(path.endswith(ext) for ext in allowed_ext):
-            return messagebox.showerror("Error", "Invalid file extension.")
-
-        save_json(path, self.record)
-        messagebox.showinfo("Saved", "Survey result saved.")
-
-# -------- RUN --------
-root = tk.Tk()
-app = SurveyApp(root)
-root.mainloop()
+        st.success(f"Your results are saved as {json_filename}")
+        st.download_button("Download your result JSON", json.dumps(record, indent=2), file_name=json_filename)
