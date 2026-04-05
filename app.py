@@ -62,7 +62,7 @@ psych_states = {
     "Moderate Cognitive Impact": (25, 36),
     "Reduced Performance State": (37, 48),
     "Severe Environmental Impact": (49, 60)
-
+}
 
 # ---------------- HELPERS ----------------
 def validate_name(name: str) -> bool:
