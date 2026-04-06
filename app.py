@@ -40,11 +40,11 @@ questions = [
 
 # -------- STATES --------
 psych_states = {
-    "Optimal Cognitive Condition": (0, 12),
-    "Slight Thermal Influence": (13, 24),
-    "Moderate Cognitive Impact": (25, 36),
-    "Reduced Performance State": (37, 48),
-    "Severe Environmental Impact": (49, 60)
+    "Very Stable Concentration": (0, 12),
+    "Slightly Affected Concentration": (13, 24),
+    "Moderately Affected Concentration": (25, 36),
+    "Highly Affected Concentration": (37, 48),
+    "Severely Affected Concentration": (49, 60)
 }
 
 # ---------------- HELPERS ----------------
