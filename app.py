@@ -97,8 +97,17 @@ surname = st.text_input("Surname")
 dob = st.text_input("Date of Birth (YYYY-MM-DD)")
 sid = st.text_input("Student ID (digits only)")
 
+# -------- FIX (session state) --------
+if "started" not in st.session_state:
+    st.session_state.started = False
+
 # --- Start Survey ---
-if st.button("Start Survey"):
+if not st.session_state.started:
+    if st.button("Start Survey"):
+        st.session_state.started = True
+
+# -------- SURVEY --------
+if st.session_state.started:
 
     # Validate inputs
     errors = []
@@ -149,7 +158,4 @@ if st.button("Start Survey"):
         }
 
         json_filename = f"{sid}_result.json"
-        save_json(json_filename, record)
 
-        st.success(f"Your results are saved as {json_filename}")
-        st.download_button("Download your result JSON", json.dumps(record, indent=2), file_name=json_filename)
