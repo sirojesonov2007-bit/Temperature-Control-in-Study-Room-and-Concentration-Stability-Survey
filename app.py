@@ -8,7 +8,6 @@ import os
 version_float = 1.1
 
 questions = [
-    
     {"q": "1. How often does the temperature of your study environment reduce your overall mental efficiency?",
      "opts": [("Never",0),("Rarely",1),("Sometimes",2),("Often",3),("Always",4)]},
 
@@ -97,34 +96,40 @@ surname = st.text_input("Surname")
 dob = st.text_input("Date of Birth (YYYY-MM-DD)")
 sid = st.text_input("Student ID (digits only)")
 
-# -------- FIX (session state) --------
+# -------- SESSION STATE --------
 if "started" not in st.session_state:
     st.session_state.started = False
+
+if "valid" not in st.session_state:
+    st.session_state.valid = False
 
 # --- Start Survey ---
 if not st.session_state.started:
     if st.button("Start Survey"):
-        st.session_state.started = True
+
+        errors = []
+        if not validate_name(name):
+            errors.append("Invalid given name.")
+        if not validate_name(surname):
+            errors.append("Invalid surname.")
+        if not validate_dob(dob):
+            errors.append("Invalid date of birth format. Use YYYY-MM-DD.")
+        if not sid.isdigit():
+            errors.append("Student ID must be digits only.")
+
+        if errors:
+            for e in errors:
+                st.error(e)
+        else:
+            st.session_state.started = True
+            st.session_state.valid = True
 
 # -------- SURVEY --------
-if st.session_state.started:
+if st.session_state.started and st.session_state.valid:
 
-    # Validate inputs
-    errors = []
-    if not validate_name(name):
-        errors.append("Invalid given name.")
-    if not validate_name(surname):
-        errors.append("Invalid surname.")
-    if not validate_dob(dob):
-        errors.append("Invalid date of birth format. Use YYYY-MM-DD.")
-    if not sid.isdigit():
-        errors.append("Student ID must be digits only.")
+    st.success("All inputs are valid. Proceed to answer the questions below.")
 
-    if errors:
-        for e in errors:
-            st.error(e)
-    else:
-        st.success("All inputs are valid. Proceed to answer the questions below.")
+    with st.form("survey_form"):
 
         total_score = 0
         answers = []
@@ -140,22 +145,23 @@ if st.session_state.started:
                 "score": score
             })
 
-        status = interpret_score(total_score)
+        submit = st.form_submit_button("Submit")
 
-        st.markdown(f"## ✅ Your Result: {status}")
-        st.markdown(f"**Total Score:** {total_score}")
+        if submit:
+            status = interpret_score(total_score)
 
-        # Save results to JSON
-        record = {
-            "name": name,
-            "surname": surname,
-            "dob": dob,
-            "student_id": sid,
-            "total_score": total_score,
-            "result": status,
-            "answers": answers,
-            "version": version_float
-        }
+            st.markdown(f"## ✅ Your Result: {status}")
+            st.markdown(f"**Total Score:** {total_score}")
 
-        json_filename = f"{sid}_result.json"
+            record = {
+                "name": name,
+                "surname": surname,
+                "dob": dob,
+                "student_id": sid,
+                "total_score": total_score,
+                "result": status,
+                "answers": answers,
+                "version": version_float
+            }
 
+            json_filename = f"{sid}_result.json"
