@@ -38,6 +38,7 @@ questions = [
      "opts": [("Excellent",0),("Good",1),("Average",2),("Below average",3),("Poor",4)]}
 ]
 
+# -------- STATES --------
 psych_states = {
     "Optimal Cognitive Condition": (0, 12),
     "Slight Thermal Influence": (13, 24),
@@ -73,81 +74,80 @@ st.title("📝 Temperature Effect Survey")
 st.info("Please fill out your details and answer all questions honestly.")
 
 # --- Initialize session state ---
-if "phase" not in st.session_state:
-    st.session_state.phase = "userinfo"  # or "survey" or "results"
+if "survey_started" not in st.session_state:
+    st.session_state.survey_started = False
 if "answers" not in st.session_state:
     st.session_state.answers = [None] * len(questions)
 if "total_score" not in st.session_state:
     st.session_state.total_score = 0
 
-# --- User Info Phase ---
-if st.session_state.phase == "userinfo":
-    name = st.text_input("Given Name", key="name")
-    surname = st.text_input("Surname", key="surname")
-    dob = st.text_input("Date of Birth (YYYY-MM-DD)", key="dob")
-    sid = st.text_input("Student ID (digits only)", key="sid")
+# --- User Info ---
+name = st.text_input("Given Name", value=st.session_state.get("name", ""))
+surname = st.text_input("Surname", value=st.session_state.get("surname", ""))
+dob = st.text_input("Date of Birth (YYYY-MM-DD)", value=st.session_state.get("dob", ""))
+sid = st.text_input("Student ID (digits only)", value=st.session_state.get("sid", ""))
 
-    if st.button("Proceed to Survey"):
-        errors = []
-        if not validate_name(name):
-            errors.append("Invalid given name.")
-        if not validate_name(surname):
-            errors.append("Invalid surname.")
-        if not validate_dob(dob):
-            errors.append("Invalid date of birth format. Use YYYY-MM-DD.")
-        if not sid.isdigit():
-            errors.append("Student ID must be digits only.")
+st.session_state.name = name
+st.session_state.surname = surname
+st.session_state.dob = dob
+st.session_state.sid = sid
 
-        if errors:
-            for e in errors:
-                st.error(e)
-        else:
-            st.session_state.phase = "survey"
-            st.session_state.name = name
-            st.session_state.surname = surname
-            st.session_state.dob = dob
-            st.session_state.sid = sid
-            st.experimental_rerun()
+# --- Start Survey ---
+def start_survey():
+    errors = []
+    if not validate_name(name):
+        errors.append("Invalid given name.")
+    if not validate_name(surname):
+        errors.append("Invalid surname.")
+    if not validate_dob(dob):
+        errors.append("Invalid date of birth format. Use YYYY-MM-DD.")
+    if not sid.isdigit():
+        errors.append("Student ID must be digits only.")
 
-# --- Survey Phase ---
-if st.session_state.phase == "survey":
-    st.markdown("### Answer the following questions:")
+    if errors:
+        for e in errors:
+            st.error(e)
+    else:
+        st.success("All inputs are valid. Proceed to answer the questions below.")
+        st.session_state.survey_started = True
+
+st.button("Start Survey", on_click=start_survey)
+
+# --- Show Questions ---
+if st.session_state.survey_started:
+    total_score = 0
+    answers = []
+
     for idx, q in enumerate(questions):
         opt_labels = [opt[0] for opt in q["opts"]]
-        choice = st.selectbox(f"Q{idx+1}. {q['q']}", opt_labels,
-                              index=0 if st.session_state.answers[idx] is None else opt_labels.index(st.session_state.answers[idx]),
-                              key=f"q{idx}")
-        st.session_state.answers[idx] = choice
+        choice = st.selectbox(f"Q{idx+1}. {q['q']}", opt_labels, key=f"q{idx}")
+        score = next(score for label, score in q["opts"] if label == choice)
+        total_score += score
+        answers.append({
+            "question": q["q"],
+            "selected_option": choice,
+            "score": score
+        })
 
-    if st.button("Submit Survey"):
-        total_score = sum(
-            next(score for label, score in q["opts"] if label == st.session_state.answers[i])
-            for i, q in enumerate(questions)
-        )
-        st.session_state.total_score = total_score
-        st.session_state.phase = "results"
-        st.experimental_rerun()
+    status = interpret_score(total_score)
 
-# --- Results Phase ---
-if st.session_state.phase == "results":
-    status = interpret_score(st.session_state.total_score)
     st.markdown(f"## ✅ Your Result: {status}")
-    st.markdown(f"**Total Score:** {st.session_state.total_score}")
+    st.markdown(f"**Total Score:** {total_score}")
 
+    # Save results to JSON
     record = {
-        "name": st.session_state.name,
-        "surname": st.session_state.surname,
-        "dob": st.session_state.dob,
-        "student_id": st.session_state.sid,
-        "total_score": st.session_state.total_score,
+        "name": name,
+        "surname": surname,
+        "dob": dob,
+        "student_id": sid,
+        "total_score": total_score,
         "result": status,
-        "answers": [{"question": q["q"], "selected_option": st.session_state.answers[i],
-                     "score": next(score for label, score in q["opts"] if label == st.session_state.answers[i])}
-                    for i, q in enumerate(questions)],
+        "answers": answers,
         "version": version_float
     }
 
-    json_filename = f"{st.session_state.sid}_result.json"
+    json_filename = f"{sid}_result.json"
     save_json(json_filename, record)
+
     st.success(f"Your results are saved as {json_filename}")
     st.download_button("Download your result JSON", json.dumps(record, indent=2), file_name=json_filename)
